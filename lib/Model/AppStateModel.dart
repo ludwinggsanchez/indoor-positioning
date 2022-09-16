@@ -3,7 +3,7 @@ import 'dart:io';
 
 import 'package:beacon_broadcast/beacon_broadcast.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:device_info/device_info.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart' as foundation;
 import 'package:geolocator/geolocator.dart';
@@ -26,7 +26,8 @@ class AppStateModel extends foundation.ChangeNotifier {
   bool gpsEnabled = false;
   bool gpsAllowed = false;
 
-  PermissionStatus locationPermissionStatus = PermissionStatus.unknown;
+  PermissionStatus locationPermissionStatus = PermissionStatus.denied;
+  FirebaseFirestore firebaseFirestore = FirebaseFirestore.instance;
 
   BeaconBroadcast beaconBroadcast = new BeaconBroadcast();
   String beaconStatusMessage;
@@ -41,13 +42,17 @@ class AppStateModel extends foundation.ChangeNotifier {
 
   List<BeaconInfo> anchorBeacons;
 
-  CollectionReference anchorPath = Firestore.instance.collection('AnchorNodes');
+  CollectionReference anchorPath =
+      FirebaseFirestore.instance.collection('AnchorNodes');
 
-  CollectionReference rangedPath = Firestore.instance.collection('RangedNodes');
+  CollectionReference rangedPath =
+      FirebaseFirestore.instance.collection('RangedNodes');
 
-  CollectionReference wtPath = Firestore.instance.collection('WeightedTri');
+  CollectionReference wtPath =
+      FirebaseFirestore.instance.collection('WeightedTri');
 
-  CollectionReference minmaxPath = Firestore.instance.collection('MinMax');
+  CollectionReference minmaxPath =
+      FirebaseFirestore.instance.collection('MinMax');
 
   Stream<QuerySnapshot> beaconSnapshots;
 
@@ -62,9 +67,10 @@ class AppStateModel extends foundation.ChangeNotifier {
   void init() async {
     debugPrint("init() called");
 
-    anchorBeacons = new List<BeaconInfo>();
+    List<BeaconInfo> anchorBeacons = [];
 
-    Firestore.instance.settings(persistenceEnabled: false);
+    FirebaseFirestore.instance.settings;
+    // FirebaseFirestore.instance.settings(persistenceEnabled: false);
 
     DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
     AndroidDeviceInfo androidInfo = await deviceInfo.androidInfo;
@@ -91,26 +97,27 @@ class AppStateModel extends foundation.ChangeNotifier {
   }
 
   void registerBeacon(BeaconInfo bc, String path) async {
-    await anchorPath.document(path).setData(bc.toJson());
+    await anchorPath.doc(path).set(bc.toJson());
   }
 
   void removeBeacon(String path) async {
-    await anchorPath.document(path).delete();
+    await anchorPath.doc(path).delete();
   }
 
   void uploadRangedBeaconData(RangedBeaconData rbd, String beaconName) async {
-    await rangedPath.document(beaconName).setData(rbd.toJson(), merge: true);
+    await rangedPath.doc(beaconName).set(rbd.toJson());
+    // await rangedPath.document(beaconName).setData(rbd.toJson(), merge: true);
   }
 
   void streamAnchorBeacons() {
     beaconSnapshots =
-        Firestore.instance.collection(anchorPath.path).snapshots();
+        FirebaseFirestore.instance.collection(anchorPath.path).snapshots();
 
     beaconStream = beaconSnapshots.listen((s) {
       anchorBeacons.clear();
-      for (var document in s.documents) {
+      for (var document in s.docs) {
         anchorBeacons = List.from(anchorBeacons);
-        anchorBeacons.add(BeaconInfo.fromJson(document.data));
+        anchorBeacons.add(BeaconInfo.fromJson(document.data()));
       }
       debugPrint("REGISTERED BEACONS: " + anchorBeacons.length.toString());
     });
@@ -135,7 +142,7 @@ class AppStateModel extends foundation.ChangeNotifier {
     var transmissionSupportStatus =
         await beaconBroadcast.checkTransmissionSupported();
     switch (transmissionSupportStatus) {
-      case BeaconStatus.SUPPORTED:
+      case BeaconStatus.supported:
         print("Beacon advertising is supported on this device");
 
         if (Platform.isAndroid) {
@@ -155,16 +162,16 @@ class AppStateModel extends foundation.ChangeNotifier {
         });
         break;
 
-      case BeaconStatus.NOT_SUPPORTED_MIN_SDK:
+      case BeaconStatus.notSupportedMinSdk:
         beaconStatusMessage =
             "Your Android system version is too low (min. is 21)";
         print(beaconStatusMessage);
         break;
-      case BeaconStatus.NOT_SUPPORTED_BLE:
+      case BeaconStatus.notSupportedBle:
         beaconStatusMessage = "Your device doesn't support BLE";
         print(beaconStatusMessage);
         break;
-      case BeaconStatus.NOT_SUPPORTED_CANNOT_GET_ADVERTISER:
+      case BeaconStatus.notSupportedCannotGetAdvertiser:
         beaconStatusMessage = "Either your chipset or driver is incompatible";
         print(beaconStatusMessage);
         break;
@@ -178,7 +185,7 @@ class AppStateModel extends foundation.ChangeNotifier {
   }
 
   checkGPS() async {
-    if (!(await Geolocator().isLocationServiceEnabled())) {
+    if (!(await Geolocator.isLocationServiceEnabled())) {
       print("GPS disabled");
       gpsEnabled = false;
     } else {
@@ -188,29 +195,30 @@ class AppStateModel extends foundation.ChangeNotifier {
   }
 
   // Adapted from: https://dev.to/ahmedcharef/flutter-wait-user-enable-gps-permission-location-4po2#:~:text=Flutter%20Permission%20handler%20Plugin&text=Check%20if%20a%20permission%20is,permission%20status%20of%20location%20service.
-  Future<bool> requestPermission(PermissionGroup permission) async {
-    final PermissionHandler _permissionHandler = PermissionHandler();
-    var result = await _permissionHandler.requestPermissions([permission]);
-    if (result[permission] == PermissionStatus.granted) {
-      return true;
-    }
-    return false;
-  }
+  // Future<bool> requestPermission(Permissions permission) async {
+  //   PermissionHandler _permissionHandler = PermissionHandler();
+  //   PermissionStatus p = PermissionStatus
+  //   var result = await _permissionHandler.requestPermissions([permission]);
+  //   if (result[permission] == PermissionStatus.granted) {
+  //     return true;
+  //   }
+  //   return false;
+  // }
 
-  // Adapted from: https://dev.to/ahmedcharef/flutter-wait-user-enable-gps-permission-location-4po2#:~:text=Flutter%20Permission%20handler%20Plugin&text=Check%20if%20a%20permission%20is,permission%20status%20of%20location%20service.
-  Future<bool> requestLocationPermission({Function onPermissionDenied}) async {
-    var granted = await requestPermission(PermissionGroup.location);
-    if (granted != true) {
-      gpsAllowed = false;
-      requestLocationPermission();
-    } else {
-      gpsAllowed = true;
-    }
-    debugPrint('requestLocationPermission $granted');
-    return granted;
-  }
+  // // Adapted from: https://dev.to/ahmedcharef/flutter-wait-user-enable-gps-permission-location-4po2#:~:text=Flutter%20Permission%20handler%20Plugin&text=Check%20if%20a%20permission%20is,permission%20status%20of%20location%20service.
+  // Future<bool> requestLocationPermission({Function onPermissionDenied}) async {
+  //   var granted = await requestPermission(PermissionGroup.location);
+  //   if (granted != true) {
+  //     gpsAllowed = false;
+  //     requestLocationPermission();
+  //   } else {
+  //     gpsAllowed = true;
+  //   }
+  //   debugPrint('requestLocationPermission $granted');
+  //   return granted;
+  // }
 
-  Future<void> checkLocationPermission() async {
-    gpsAllowed = await requestPermission(PermissionGroup.location);
-  }
+  // Future<void> checkLocationPermission() async {
+  //   gpsAllowed = await requestPermission(PermissionGroup.location);
+  // }
 }

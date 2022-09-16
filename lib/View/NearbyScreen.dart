@@ -1,11 +1,12 @@
 import 'dart:async';
 
-import 'package:connectivity/connectivity.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:umbrella/Model/AppStateModel.dart';
 import 'package:umbrella/Model/BeaconInfo.dart';
 import 'package:umbrella/Model/RangedBeaconData.dart';
 import 'package:flutter_ble_lib/flutter_ble_lib.dart';
+import 'package:umbrella/Model/permissions.dart';
 import 'package:umbrella/widgets.dart';
 import 'package:umbrella/UmbrellaBeaconTools/UmbrellaBeacon.dart';
 import 'package:wakelock/wakelock.dart';
@@ -33,6 +34,8 @@ class NearbyScreen extends StatefulWidget {
 }
 
 class NearbyScreenState extends State<NearbyScreen> {
+  PermissionsModel permissionsModel = PermissionsModel();
+
   UmbrellaBeacon umbrellaBeacon = UmbrellaBeacon.instance;
 
   BleManager bleManager = BleManager();
@@ -176,8 +179,10 @@ class NearbyScreenState extends State<NearbyScreen> {
               appStateModel.addMinMaxXY(minMaxCoordinates);
             }
 
-            new Timer(const Duration(seconds: 1),
-                () => appStateModel.uploadRangedBeaconData(rbd, pBeacon.phoneMake + "+" + pBeacon.beaconUUID));
+            new Timer(
+                const Duration(seconds: 1),
+                () => appStateModel.uploadRangedBeaconData(
+                    rbd, pBeacon.phoneMake + "+" + pBeacon.beaconUUID));
 
             return RangedBeaconCard(beacon: rbd);
           }
@@ -202,9 +207,10 @@ class NearbyScreenState extends State<NearbyScreen> {
       return new FloatingActionButton(
           child: new Icon(Icons.search),
           backgroundColor: Colors.greenAccent,
-          onPressed: () {
+          onPressed: () async {
             appStateModel.checkGPS();
-            appStateModel.checkLocationPermission();
+            // appStateModel.checkLocationPermission();
+            await permissionsModel.getPermission();
             if (appStateModel.wifiEnabled &
                 appStateModel.bluetoothEnabled &
                 appStateModel.gpsEnabled &
@@ -228,7 +234,7 @@ class NearbyScreenState extends State<NearbyScreen> {
 
   @override
   Widget build(BuildContext context) {
-    var tiles = new List<Widget>();
+    List<Widget> tiles = [];
 
     tiles.addAll(buildRangedBeaconTiles());
 
@@ -252,10 +258,22 @@ class NearbyScreenState extends State<NearbyScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          (rangedAnchorBeacons.length < 3) ?
-          buildInfoTitle(context, "You need " + (3 - rangedAnchorBeacons.length).toString() + " more anchor nodes for position estimate"):
-          buildInfoTitle(context, "Estimated Trilateration position: " + wtCoordinates['x'].toStringAsFixed(4) + " , " + wtCoordinates['y'].toStringAsFixed(4)
-          + "\n\nEstimated Min Max position: " + minMaxCoordinates['x'].toStringAsFixed(4) + " , " + minMaxCoordinates['y'].toStringAsFixed(4)),
+          (rangedAnchorBeacons.length < 3)
+              ? buildInfoTitle(
+                  context,
+                  "You need " +
+                      (3 - rangedAnchorBeacons.length).toString() +
+                      " more anchor nodes for position estimate")
+              : buildInfoTitle(
+                  context,
+                  "Estimated Trilateration position: " +
+                      wtCoordinates['x'].toStringAsFixed(4) +
+                      " , " +
+                      wtCoordinates['y'].toStringAsFixed(4) +
+                      "\n\nEstimated Min Max position: " +
+                      minMaxCoordinates['x'].toStringAsFixed(4) +
+                      " , " +
+                      minMaxCoordinates['y'].toStringAsFixed(4)),
           (connectivityResult == ConnectivityResult.none)
               ? buildAlertTile(context, "Wifi required to send beacon data")
               : new Container(),

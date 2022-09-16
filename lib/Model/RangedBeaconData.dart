@@ -1,13 +1,11 @@
-
 class RangedBeaconData {
-  List<double> rawRssi = new List<double>();
-  List<double> rawRssiDistance = new List<double>();
-  List<double> kfRssi = new List<double>();
-  List<double> kfRssiDistance = new List<double>();
+  List<double> rawRssi = [];
+  List<double> rawRssiDistance = [];
+  List<double> kfRssi = [];
+  List<double> kfRssiDistance = [];
 
   double x;
   double y;
-
 
   RangedBeaconData(String pPhoneMake, String pBeaconUUID, int pTxAt1Meter) {
     phoneMake = pPhoneMake;

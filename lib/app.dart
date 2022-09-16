@@ -4,9 +4,6 @@ import 'package:umbrella/View/OpeningScreen.dart';
 
 import 'Model/AppStateModel.dart';
 
-
-
-
 class UmbrellaMain extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -39,7 +36,7 @@ class BottomNavState extends State<BottomNav> {
     super.initState();
 
     AppStateModel appStateModel = AppStateModel.instance;
-    
+
     appStateModel.init();
   }
 
@@ -53,11 +50,11 @@ class BottomNavState extends State<BottomNav> {
           items: const <BottomNavigationBarItem>[
             BottomNavigationBarItem(
               icon: Icon(Icons.record_voice_over),
-              title: Text('Anchor'),
+              label: 'Anchor',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.directions_walk),
-              title: Text('Mobile'),
+              label: 'Mobile',
             ),
           ],
           currentIndex: _selectedIndex,

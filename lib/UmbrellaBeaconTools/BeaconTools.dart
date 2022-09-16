@@ -10,7 +10,7 @@ export 'package:flutter_ble_lib/flutter_ble_lib.dart' show ScanResult;
 
 const EddystoneServiceId = "0000feaa-0000-1000-8000-00805f9b34fb";
 
-List<Beacon> beaconList = new List();
+List<Beacon> beaconList = [];
 
 KalmanFilter kf = new KalmanFilter(0.065, 1.4, 0, 0);
 
@@ -21,8 +21,7 @@ abstract class Beacon {
 
   double get rawRssi => scanResult.rssi.toDouble();
 
-  double get kfRssi =>
-      kf.getFilteredValue(rawRssi);
+  double get kfRssi => kf.getFilteredValue(rawRssi);
 
   String get name => scanResult.peripheral.name;
 
@@ -41,11 +40,13 @@ abstract class Beacon {
   }
 
   double get rawRssiLibraryDistance {
-    return AndroidBeaconLibraryModel().getCalculatedDistance(rawRssi, txAt1Meter);
+    return AndroidBeaconLibraryModel()
+        .getCalculatedDistance(rawRssi, txAt1Meter);
   }
 
   double get kfRssiLibraryDistance {
-    return AndroidBeaconLibraryModel().getCalculatedDistance(kfRssi, txAt1Meter);
+    return AndroidBeaconLibraryModel()
+        .getCalculatedDistance(kfRssi, txAt1Meter);
   }
 
   const Beacon({@required this.tx, @required this.scanResult});
@@ -116,13 +117,13 @@ class EddystoneUID extends Eddystone {
     List<int> rawBytes =
         scanResult.advertisementData.serviceData[EddystoneServiceId];
     var frameType = rawBytes[0];
-  //  print("frameType: " + frameType.toString());
+    //  print("frameType: " + frameType.toString());
     var tx = byteToInt8(rawBytes[1]);
- //   print("tx power: " + tx.toString());
+    //   print("tx power: " + tx.toString());
     var namespaceId = byteListToHexString(rawBytes.sublist(2, 12));
 //    print("namespace id: " + namespaceId);
     var beaconId = byteListToHexString(rawBytes.sublist(12, 18));
- //   print("beacon id: " + beaconId);
+    //   print("beacon id: " + beaconId);
 
     return EddystoneUID(
         frameType: frameType,

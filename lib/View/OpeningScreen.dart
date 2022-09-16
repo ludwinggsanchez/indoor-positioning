@@ -1,15 +1,15 @@
 import 'dart:async';
 
-import 'package:device_info/device_info.dart';
-import 'package:flutter/cupertino.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_ble_lib/flutter_ble_lib.dart';
 import 'package:umbrella/Model/AppStateModel.dart';
 import 'package:umbrella/Model/BeaconInfo.dart';
+import 'package:umbrella/Model/permissions.dart';
 import 'package:umbrella/widgets.dart';
 import '../styles.dart';
 import 'package:wakelock/wakelock.dart';
-import 'package:connectivity/connectivity.dart';
 
 AppStateModel appStateModel = AppStateModel.instance;
 String phoneMake = "";
@@ -42,7 +42,7 @@ class OpeningScreenState extends State<OpeningScreen> {
     super.initState();
     print("Showing Opening Screen");
 
-    appStateModel.requestLocationPermission();
+    // appStateModel.requestLocationPermission();
 
     BleManager bleManager = BleManager();
     bleManager.createClient();
@@ -58,7 +58,7 @@ class OpeningScreenState extends State<OpeningScreen> {
           debugPrint("Network connected");
         } else {
           appStateModel.wifiEnabled = false;
-          
+
           appStateModel.stopBeaconBroadcast();
           appStateModel.isBroadcasting = false;
         }
@@ -74,7 +74,7 @@ class OpeningScreenState extends State<OpeningScreen> {
           debugPrint("Bluetooth is on");
         } else {
           appStateModel.bluetoothEnabled = false;
-          
+
           appStateModel.stopBeaconBroadcast();
           appStateModel.isBroadcasting = false;
         }
@@ -128,7 +128,7 @@ class OpeningScreenState extends State<OpeningScreen> {
       return new FloatingActionButton(
           child: new Icon(Icons.record_voice_over),
           backgroundColor: Colors.greenAccent,
-          onPressed: () {
+          onPressed: () async {
             // It is acceptable to leave both empty,
             // but you can't have one with text and the other without
             if (xInput.text.isEmpty & yInput.text.isEmpty) {
@@ -151,7 +151,9 @@ class OpeningScreenState extends State<OpeningScreen> {
             }
 
             appStateModel.checkGPS();
-            appStateModel.checkLocationPermission();
+            // appStateModel.checkLocationPermission();
+            PermissionsModel permissionsModel = PermissionsModel();
+            await permissionsModel.getPermission();
             if (appStateModel.wifiEnabled &
                 appStateModel.bluetoothEnabled &
                 appStateModel.gpsEnabled &
@@ -206,26 +208,23 @@ class OpeningScreenState extends State<OpeningScreen> {
       ),
       floatingActionButton: buildBroadcastButton(),
       body: new Stack(children: <Widget>[
-                        (connectivityResult == ConnectivityResult.none)
-                    ? buildAlertTile(
-                        context, "Wifi required to broadcast beacon")
-                    : new Container(),
-                (appStateModel.isBroadcasting)
-                    ? buildProgressBarTile()
-                    : new Container(),
-                (blState != BluetoothState.POWERED_ON)
-                    ? buildAlertTile(
-                        context, "Please check whether Bluetooth is on")
-                    : new Container(),
+        (connectivityResult == ConnectivityResult.none)
+            ? buildAlertTile(context, "Wifi required to broadcast beacon")
+            : new Container(),
+        (appStateModel.isBroadcasting)
+            ? buildProgressBarTile()
+            : new Container(),
+        (blState != BluetoothState.POWERED_ON)
+            ? buildAlertTile(context, "Please check whether Bluetooth is on")
+            : new Container(),
         Align(
           child: SingleChildScrollView(
             child: Center(
                 child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.center,
-              children: <Widget>[ 
+              children: <Widget>[
                 BeaconInfoContainer(beaconInfo: bc),
-
                 Container(
                   margin: EdgeInsets.only(top: 30, left: 30, right: 30),
                   width: MediaQuery.of(context).size.width,
