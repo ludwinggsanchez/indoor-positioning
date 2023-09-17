@@ -11,13 +11,12 @@ class UmbrellaBeacon {
   static UmbrellaBeacon _instance = new UmbrellaBeacon._();
 
   static UmbrellaBeacon get instance => _instance;
-  
+
   Stream<Beacon> scan(BleManager bleManager) => bleManager
       .startPeripheralScan(
-        scanMode: ScanMode.lowLatency,
-        callbackType: CallbackType.allMatches,
-        allowDuplicates: true
-      )
+          scanMode: ScanMode.lowLatency,
+          callbackType: CallbackType.allMatches,
+          allowDuplicates: true)
       .map((scanResult) {
         return Beacon.fromScanResult(scanResult);
       })

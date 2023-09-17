@@ -12,19 +12,23 @@ import 'package:umbrella/UmbrellaBeaconTools/UmbrellaBeacon.dart';
 import 'package:wakelock/wakelock.dart';
 import 'package:umbrella/UmbrellaBeaconTools/LocalizationAlgorithms.dart';
 import '../styles.dart';
+import 'plot.dart' as plot;
+import 'dart:math';
 
 String beaconStatusMessage;
 AppStateModel appStateModel = AppStateModel.instance;
 
 Localization localization = new Localization();
 
-Map<String, double> wtCoordinates;
-Map<String, double> minMaxCoordinates;
+bool selectedDestination;
+Offset pressedPlace;
+plot.PlotMap painterMap;
+
+Point wtCoordinates = new Point(0, 0);
+Point minMaxCoordinates = new Point(0, 0);
 
 Map<String, RangedBeaconData> rangedAnchorBeacons =
     new Map<String, RangedBeaconData>();
-
-RangedBeaconData rbd;
 
 class NearbyScreen extends StatefulWidget {
   @override
@@ -51,10 +55,13 @@ class NearbyScreenState extends State<NearbyScreen> {
   // State
   StreamSubscription bluetoothChanges;
   BluetoothState blState = BluetoothState.UNKNOWN;
+  List<Point> location = [];
 
   @override
   void initState() {
     super.initState();
+
+    painterMap = plot.PlotMap(handlePointPressed, closeLabel);
 
     bleManager.createClient();
 
@@ -130,66 +137,72 @@ class NearbyScreenState extends State<NearbyScreen> {
     });
   }
 
-  buildRangedBeaconTiles() {
+  void locations() {
     List<BeaconInfo> anchorBeacons = AppStateModel.instance.getAnchorBeacons();
 
-    return beacons.values.map<Widget>((b) {
-      if (b is EddystoneUID) {
-        for (var pBeacon in anchorBeacons) {
-          if (pBeacon.beaconUUID == b.namespaceId) {
-            //beaconDebugInfo(pBeacon, b);
+    if (anchorBeacons.length == 0) {
+      return;
+    }
 
-            // If beacon has already been added, update lists and upload to database
-            // else, create a new RangedBeaconInfo obj and add that
+    for (var beacon in beacons.values) {
+      if (beacon is IBeaconUID) {
+        var anchored = anchorBeacons.firstWhere(
+            (ab) =>
+                ab.beaconUUID == beacon.uuid &&
+                ab.major == beacon.major &&
+                ab.minor == beacon.minor,
+            orElse: () => null);
 
-            if (!rangedAnchorBeacons.containsKey(pBeacon.beaconUUID)) {
-              rbd = new RangedBeaconData(
-                  pBeacon.phoneMake, pBeacon.beaconUUID, b.tx);
-              rbd.addRawRssi(b.rawRssi);
-              rbd.addRawRssiDistance(b.rawRssiLogDistance);
-              rbd.addkfRssi(b.kfRssi);
-              rbd.addkfRssiDistance(b.kfRssiLogDistance);
+        if (anchored == null) {
+          continue;
+        }
 
-              rbd.x = pBeacon.x;
-              rbd.y = pBeacon.y;
+        final idd = anchored.beaconUUID +
+            anchored.major.toString() +
+            anchored.minor.toString();
 
-              rangedAnchorBeacons[pBeacon.beaconUUID] = rbd;
-            } else {
-              rbd = rangedAnchorBeacons[pBeacon.beaconUUID];
-              rbd.addRawRssi(b.rawRssi);
-              rbd.addRawRssiDistance(b.rawRssiLogDistance);
-              rbd.addkfRssi(b.kfRssi);
-              rbd.addkfRssiDistance(b.kfRssiLogDistance);
+        final RangedBeaconData rbd = new RangedBeaconData();
 
-              rangedAnchorBeacons[pBeacon.beaconUUID] = rbd;
-            }
+        rbd.beaconUUID = idd;
+        rbd.x = anchored.x;
+        rbd.y = anchored.y;
 
-            Map<RangedBeaconData, double> rbdDistance = {
-              rbd: b.kfRssiLogDistance
-            };
+        rbd.rawRssi = beacon.rawRssi;
+        rbd.kfRssi = beacon.kfRssi;
 
-            localization.addAnchorNode(rbd.beaconUUID, rbdDistance);
-            if (localization.conditionsMet) {
-              // print("Enough beacons for trilateration");
+        rbd.rawRssiDistance = beacon.rawRssiLogDistance;
+        rbd.kfRssiDistance = beacon.kfRssiLogDistance;
+        rangedAnchorBeacons[idd] = rbd;
 
-              wtCoordinates = localization.WeightedTrilaterationPosition();
-              appStateModel.addWTXY(wtCoordinates);
+        localization.addAnchorNode(idd, rangedAnchorBeacons[idd]);
 
-              minMaxCoordinates = localization.MinMaxPosition();
-              appStateModel.addMinMaxXY(minMaxCoordinates);
-            }
-
-            new Timer(
-                const Duration(seconds: 1),
-                () => appStateModel.uploadRangedBeaconData(
-                    rbd, pBeacon.phoneMake + "+" + pBeacon.beaconUUID));
-
-            return RangedBeaconCard(beacon: rbd);
-          }
+        if (localization.conditionsMet) {
+          wtCoordinates = localization.WeightedTrilaterationPosition();
+          minMaxCoordinates = localization.MinMaxPosition();
         }
       }
-      return Card();
-    }).toList();
+    }
+
+    return;
+  }
+
+  void handlePointPressed(Offset point) {
+    setState(() {
+      pressedPlace = point;
+    });
+  }
+
+  void handlePlaceSelected(Offset point) {
+    setState(() {
+      selectedDestination = true;
+    });
+  }
+
+  void closeLabel() {
+    setState(() {
+      pressedPlace = null;
+      selectedDestination = false;
+    });
   }
 
   buildScanButton() {
@@ -213,8 +226,7 @@ class NearbyScreenState extends State<NearbyScreen> {
             await permissionsModel.getPermission();
             if (appStateModel.wifiEnabled &
                 appStateModel.bluetoothEnabled &
-                appStateModel.gpsEnabled &
-                appStateModel.gpsAllowed) {
+                appStateModel.gpsEnabled) {
               startScan();
               setState(() {
                 appStateModel.isScanning = true;
@@ -234,9 +246,10 @@ class NearbyScreenState extends State<NearbyScreen> {
 
   @override
   Widget build(BuildContext context) {
-    List<Widget> tiles = [];
-
-    tiles.addAll(buildRangedBeaconTiles());
+    this.locations();
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+    bool isFrozen = false;
 
     return Scaffold(
       appBar: new AppBar(
@@ -246,7 +259,7 @@ class NearbyScreenState extends State<NearbyScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
             const Text(
-              'Umbrella',
+              'UD',
               style: TextStyle(color: Colors.black),
             ),
             const Image(image: AssetImage('assets/icons8-umbrella-24.png'))
@@ -255,39 +268,87 @@ class NearbyScreenState extends State<NearbyScreen> {
       ),
       floatingActionButton: buildScanButton(),
       body: new Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        mainAxisAlignment: MainAxisAlignment.center,
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
           (rangedAnchorBeacons.length < 3)
-              ? buildInfoTitle(
-                  context,
-                  "You need " +
-                      (3 - rangedAnchorBeacons.length).toString() +
-                      " more anchor nodes for position estimate")
+              ? buildInfoTitle(context, "Estableciendo posición")
               : buildInfoTitle(
                   context,
-                  "Estimated Trilateration position: " +
-                      wtCoordinates['x'].toStringAsFixed(4) +
-                      " , " +
-                      wtCoordinates['y'].toStringAsFixed(4) +
-                      "\n\nEstimated Min Max position: " +
-                      minMaxCoordinates['x'].toStringAsFixed(4) +
-                      " , " +
-                      minMaxCoordinates['y'].toStringAsFixed(4)),
+                  "wtPos: " +
+                      wtCoordinates.x?.toStringAsFixed(2) +
+                      ", " +
+                      wtCoordinates.y?.toStringAsFixed(2) +
+                      "\n" +
+                      "mmPos: " +
+                      minMaxCoordinates.x?.toStringAsFixed(2) +
+                      ", " +
+                      minMaxCoordinates.y?.toStringAsFixed(2)),
+          (rangedAnchorBeacons.length == 0)
+              ? buildInfoTitle(context, "Estableciendo posición")
+              : buildInfoTitle(context, "dis " + localization.getDistances()),
           (connectivityResult == ConnectivityResult.none)
               ? buildAlertTile(context, "Wifi required to send beacon data")
-              : new Container(),
+              : Container(),
           (appStateModel.isScanning) ? buildProgressBarTile() : new Container(),
           (blState != BluetoothState.POWERED_ON)
               ? buildAlertTile(context, "Please check that Bluetooth is on")
-              : new Container(),
-          Expanded(
-            child: new ListView(
-              children: tiles,
-            ),
-          )
+              : Container(),
+          Container(
+              child: Center(
+                  child: GestureDetector(
+                      onTapUp: (details) {
+                        if (!isFrozen) {
+                          setState(() {
+                            isFrozen = true;
+                          });
+                          Future.delayed(Duration(seconds: 3), () {
+                            setState(() {
+                              isFrozen = false;
+                            });
+                          });
+                        }
+                      },
+                      onTapDown: (TapDownDetails details) {
+                        painterMap.handlePointPressed(details.localPosition,
+                            Size(screenWidth * 0.9, screenHeight * 0.5));
+                      },
+                      child: Stack(
+                        children: [
+                          CustomPaint(
+                            painter: painterMap,
+                            foregroundPainter: plot.PlotLocationPainter(
+                                [wtCoordinates, minMaxCoordinates, trilaterate],
+                                goTo(),
+                                isFrozen),
+                            size: Size(screenWidth * 0.9, screenHeight * 0.5),
+                          ),
+                          (pressedPlace != null)
+                              ? Positioned(
+                                  left: pressedPlace.dx,
+                                  top: pressedPlace.dy,
+                                  child: ElevatedButton(
+                                    onPressed: () {
+                                      selectedDestination = true;
+                                    },
+                                    child: Text('Ir ->'),
+                                  ),
+                                )
+                              : Container(),
+                        ],
+                      )))),
         ],
       ),
     );
   }
+
+  goTo() {
+    if (selectedDestination == true) {
+      return pressedPlace;
+    }
+
+    return null;
+  }
+
 }

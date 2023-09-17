@@ -89,15 +89,15 @@ class RangedBeaconCard extends StatelessWidget {
               padding: const EdgeInsets.all(8.0),
               child: Align(
                 alignment: Alignment.center,
-                child: Text("Raw Rssi: " + beacon.rawRssi.last.toString()),
+                child: Text("Raw Rssi: " + beacon.rawRssi.toString()),
               ),
             ),
             Padding(
               padding: const EdgeInsets.all(8.0),
               child: Align(
                 alignment: Alignment.center,
-                child: Text(
-                    "Kalman Filtered Rssi: " + beacon.rawRssi.last.toString()),
+                child:
+                    Text("Kalman Filtered Rssi: " + beacon.rawRssi.toString()),
               ),
             ),
             Padding(
@@ -105,7 +105,7 @@ class RangedBeaconCard extends StatelessWidget {
               child: Align(
                 alignment: Alignment.center,
                 child: Text("Raw Distance: " +
-                    beacon.rawRssiDistance.last.toStringAsFixed(4)),
+                    beacon.rawRssiDistance.toStringAsFixed(4)),
               ),
             ),
             Padding(
@@ -113,7 +113,7 @@ class RangedBeaconCard extends StatelessWidget {
               child: Align(
                 alignment: Alignment.center,
                 child: Text("Kalman Filtered Distance: " +
-                    beacon.kfRssiDistance.last.toStringAsFixed(4)),
+                    beacon.kfRssiDistance.toStringAsFixed(4)),
               ),
             )
           ],

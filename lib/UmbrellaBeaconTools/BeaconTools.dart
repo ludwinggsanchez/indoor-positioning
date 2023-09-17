@@ -8,7 +8,7 @@ import 'package:umbrella/utils.dart';
 import 'package:quiver/core.dart';
 export 'package:flutter_ble_lib/flutter_ble_lib.dart' show ScanResult;
 
-const EddystoneServiceId = "0000feaa-0000-1000-8000-00805f9b34fb";
+const IBeaconManufacturerId = 0x004C;
 
 List<Beacon> beaconList = [];
 
@@ -53,9 +53,9 @@ abstract class Beacon {
 
   static List<Beacon> fromScanResult(ScanResult scanResult) {
     try {
-      EddystoneUID eddystoneBeacon = EddystoneUID.fromScanResult(scanResult);
-      if (eddystoneBeacon != null) {
-        beaconList.add(eddystoneBeacon);
+      IBeaconUID iBeacon = IBeaconUID.fromScanResult(scanResult);
+      if (iBeacon != null) {
+        beaconList.add(iBeacon);
       }
     } on Exception catch (e) {
       print("ERROR: " + e.toString());
@@ -65,80 +65,64 @@ abstract class Beacon {
   }
 }
 
-// Base class of all Eddystone beacons
-abstract class Eddystone extends Beacon {
-  const Eddystone(
-      {@required this.frameType,
+// Base class of all IBeacons beacons
+abstract class IBeacon extends Beacon {
+  const IBeacon({@required int tx, @required ScanResult scanResult})
+      : super(tx: tx, scanResult: scanResult);
+
+  @override
+  int get txAt1Meter => tx - 64;
+}
+
+class IBeaconUID extends IBeacon {
+  final String uuid;
+  final int major;
+  final int minor;
+
+  const IBeaconUID(
+      {@required this.uuid,
+      @required this.major,
+      @required this.minor,
       @required int tx,
       @required ScanResult scanResult})
       : super(tx: tx, scanResult: scanResult);
 
-  final int frameType;
-
-  @override
-  int get txAt1Meter => tx - 59;
-}
-
-class EddystoneUID extends Eddystone {
-  final String namespaceId;
-  final String beaconId;
-
-  const EddystoneUID(
-      {@required int frameType,
-      @required this.namespaceId,
-      @required this.beaconId,
-      @required int tx,
-      @required ScanResult scanResult})
-      : super(tx: tx, scanResult: scanResult, frameType: frameType);
-
-  factory EddystoneUID.fromScanResult(ScanResult scanResult) {
-    // print("Scanning for Eddystone beacon");
-
-    if (scanResult.advertisementData.serviceData == null) {
-      // debugPrint("Service data is null");
+  factory IBeaconUID.fromScanResult(ScanResult scanResult) {
+    if (scanResult.advertisementData.manufacturerData == null) {
+      return null;
+    }
+    if (!scanResult.advertisementData.manufacturerData
+        .contains(IBeaconManufacturerId)) {
+      return null;
+    }
+    if (scanResult.advertisementData.manufacturerData.length < 23) {
+      return null;
+    }
+    if (scanResult.advertisementData.manufacturerData[2] != 0x02 ||
+        scanResult.advertisementData.manufacturerData[3] != 0x15) {
       return null;
     }
 
-    if (!scanResult.advertisementData.serviceData
-        .containsKey(EddystoneServiceId)) {
-      return null;
-    }
-    if (scanResult.advertisementData.serviceData[EddystoneServiceId].length <
-        18) {
-      return null;
-    }
-    if (scanResult.advertisementData.serviceData[EddystoneServiceId][0] !=
-        0x00) {
-      return null;
-    }
-
-    // print("Eddystone beacon detected!");
-
-    List<int> rawBytes =
-        scanResult.advertisementData.serviceData[EddystoneServiceId];
-    var frameType = rawBytes[0];
-    //  print("frameType: " + frameType.toString());
-    var tx = byteToInt8(rawBytes[1]);
-    //   print("tx power: " + tx.toString());
-    var namespaceId = byteListToHexString(rawBytes.sublist(2, 12));
-//    print("namespace id: " + namespaceId);
-    var beaconId = byteListToHexString(rawBytes.sublist(12, 18));
-    //   print("beacon id: " + beaconId);
-
-    return EddystoneUID(
-        frameType: frameType,
-        namespaceId: namespaceId,
-        beaconId: beaconId,
-        tx: tx,
-        scanResult: scanResult);
+    List<int> rawBytes = scanResult.advertisementData.manufacturerData;
+    var uuid = byteListToHexString(rawBytes.sublist(4, 20));
+    var major = twoByteToInt16(rawBytes[20], rawBytes[21]);
+    var minor = twoByteToInt16(rawBytes[22], rawBytes[23]);
+    var tx = byteToInt8(rawBytes[24]);
+    return IBeaconUID(
+      uuid: uuid,
+      major: major,
+      minor: minor,
+      tx: tx,
+      scanResult: scanResult,
+    );
   }
 
   int get hash => hashObjects([
-        "EddystoneUID",
-        EddystoneServiceId,
-        this.frameType,
-        this.namespaceId,
-        this.beaconId,
+        "IBeacon",
+        IBeaconManufacturerId,
+        this.uuid,
+        this.major,
+        this.minor,
         this.tx
       ]);
 }

@@ -21,21 +21,21 @@ String byteListToHexString(List<int> bytes) => bytes
     .reduce((a, b) => (a + b));
 
 beaconDebugInfo(BeaconInfo pBeacon, Beacon b) {
-            debugPrint("Beacon " +
-                pBeacon.phoneMake +
-                "+" +
-                pBeacon.beaconUUID +
-                " is nearby!");
-            print("tx power: " + b.tx.toString());
-            print("Raw rssi: " + b.rawRssi.toString());
-            print("Filtered rssi: " + b.kfRssi.toString());
-            print("Log distance with raw rssi: " + b.rawRssiLogDistance.toString());
-            print("Log distance with filtered rssi: " + b.kfRssiLogDistance.toString());
-            print("RadiusNetworks distance with raw rssi: " + b.rawRssiLibraryDistance.toString());
-            print("RadiusNetworks distance with filtered rssi: " + b.kfRssiLibraryDistance.toString());
-} 
+  debugPrint(
+      "Beacon " + pBeacon.phoneMake + "+" + pBeacon.beaconUUID + " is nearby!");
+  print("tx power: " + b.tx.toString());
+  print("Raw rssi: " + b.rawRssi.toString());
+  print("Filtered rssi: " + b.kfRssi.toString());
+  print("Log distance with raw rssi: " + b.rawRssiLogDistance.toString());
+  print("Log distance with filtered rssi: " + b.kfRssiLogDistance.toString());
+  print("RadiusNetworks distance with raw rssi: " +
+      b.rawRssiLibraryDistance.toString());
+  print("RadiusNetworks distance with filtered rssi: " +
+      b.kfRssiLibraryDistance.toString());
+}
 
 // https://arxiv.org/ftp/arxiv/papers/1912/1912.07801.pdf
-errorRateforCoordinate(double realX, double estimatedX, double realY, double estimatedY) {
-  return sqrt(pow((realX-estimatedX), 2) + pow((realY-estimatedY), 2));
+errorRateforCoordinate(
+    double realX, double estimatedX, double realY, double estimatedY) {
+  return sqrt(pow((realX - estimatedX), 2) + pow((realY - estimatedY), 2));
 }

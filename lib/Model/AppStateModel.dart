@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:beacon_broadcast/beacon_broadcast.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/cupertino.dart';
@@ -11,7 +10,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:uuid/uuid.dart';
 import '../utils.dart';
 import 'BeaconInfo.dart';
-import 'RangedBeaconData.dart';
+import 'facilities.dart';
 
 class AppStateModel extends foundation.ChangeNotifier {
   // Singleton
@@ -29,9 +28,7 @@ class AppStateModel extends foundation.ChangeNotifier {
   PermissionStatus locationPermissionStatus = PermissionStatus.denied;
   FirebaseFirestore firebaseFirestore = FirebaseFirestore.instance;
 
-  BeaconBroadcast beaconBroadcast = new BeaconBroadcast();
   String beaconStatusMessage;
-  bool isBroadcasting = false;
   bool isScanning = false;
 
   Uuid uuid = new Uuid();
@@ -40,7 +37,9 @@ class AppStateModel extends foundation.ChangeNotifier {
 
   String phoneMake = "";
 
-  List<BeaconInfo> anchorBeacons;
+  List<BeaconInfo> anchorBeacons = [];
+  List<Floor> floors = [];
+  List<Place> places = [];
 
   CollectionReference anchorPath =
       FirebaseFirestore.instance.collection('AnchorNodes');
@@ -54,10 +53,21 @@ class AppStateModel extends foundation.ChangeNotifier {
   CollectionReference minmaxPath =
       FirebaseFirestore.instance.collection('MinMax');
 
+  CollectionReference floorPath =
+      FirebaseFirestore.instance.collection('Floor');
+
+  CollectionReference placesPath =
+      FirebaseFirestore.instance.collection('Places');
   Stream<QuerySnapshot> beaconSnapshots;
+  Stream<QuerySnapshot> floorSnapshots;
+  Stream<QuerySnapshot> placesSnapshots;
 
   // ignore: cancel_subscriptions
   StreamSubscription beaconStream;
+  // ignore: cancel_subscriptions
+  StreamSubscription floorStream;
+  // ignore: cancel_subscriptions
+  StreamSubscription placesStream;
 
   @override
   void notifyListeners() {
@@ -66,8 +76,6 @@ class AppStateModel extends foundation.ChangeNotifier {
 
   void init() async {
     debugPrint("init() called");
-
-    List<BeaconInfo> anchorBeacons = [];
 
     FirebaseFirestore.instance.settings;
     // FirebaseFirestore.instance.settings(persistenceEnabled: false);
@@ -94,19 +102,12 @@ class AppStateModel extends foundation.ChangeNotifier {
       }
     }
     streamAnchorBeacons();
-  }
-
-  void registerBeacon(BeaconInfo bc, String path) async {
-    await anchorPath.doc(path).set(bc.toJson());
+    streamFloors();
+    streamPlaces();
   }
 
   void removeBeacon(String path) async {
     await anchorPath.doc(path).delete();
-  }
-
-  void uploadRangedBeaconData(RangedBeaconData rbd, String beaconName) async {
-    await rangedPath.doc(beaconName).set(rbd.toJson());
-    // await rangedPath.document(beaconName).setData(rbd.toJson(), merge: true);
   }
 
   void streamAnchorBeacons() {
@@ -114,7 +115,7 @@ class AppStateModel extends foundation.ChangeNotifier {
         FirebaseFirestore.instance.collection(anchorPath.path).snapshots();
 
     beaconStream = beaconSnapshots.listen((s) {
-      anchorBeacons.clear();
+      anchorBeacons = [];
       for (var document in s.docs) {
         anchorBeacons = List.from(anchorBeacons);
         anchorBeacons.add(BeaconInfo.fromJson(document.data()));
@@ -123,65 +124,52 @@ class AppStateModel extends foundation.ChangeNotifier {
     });
   }
 
+  void streamFloors() {
+    floorSnapshots =
+        FirebaseFirestore.instance.collection(floorPath.path).snapshots();
+
+    floorStream = floorSnapshots.listen((s) {
+      floors = [];
+      for (var document in s.docs) {
+        floors = List.from(floors);
+        floors.add(Floor.fromJson(document.data(), document.id));
+      }
+      debugPrint("REGISTERED FLOORS: " + floors.length.toString());
+    });
+  }
+
+  void streamPlaces() {
+    placesSnapshots =
+        FirebaseFirestore.instance.collection(placesPath.path).snapshots();
+
+    placesStream = placesSnapshots.listen((s) {
+      places = [];
+      for (var document in s.docs) {
+        places = List.from(places);
+        places.add(Place.fromJson(document.data(), document.id));
+      }
+    });
+  }
+
+  addWTXY(var coordinates) async {
+    // print("Data sent to Firestore: $coordinates");
+    // await wtPath.add(coordinates);
+  }
+
+  addMinMaxXY(var coordinates) async {
+    // await minmaxPath.add(coordinates);
+  }
+
   List<BeaconInfo> getAnchorBeacons() {
     return anchorBeacons;
   }
 
-  addWTXY(var coordinates) async {
-    print("Data sent to Firestore: $coordinates");
-    await wtPath.add(coordinates);
+  List<Floor> getFloors() {
+    return floors;
   }
 
-  addMinMaxXY(var coordinates) async {
-    await minmaxPath.add(coordinates);
-  }
-
-  startBeaconBroadcast() async {
-    BeaconBroadcast beaconBroadcast = BeaconBroadcast();
-
-    var transmissionSupportStatus =
-        await beaconBroadcast.checkTransmissionSupported();
-    switch (transmissionSupportStatus) {
-      case BeaconStatus.supported:
-        print("Beacon advertising is supported on this device");
-
-        if (Platform.isAndroid) {
-          debugPrint("User beacon uuid: " + id);
-
-          beaconBroadcast
-              .setUUID(id)
-              .setMajorId(randomNumber(1, 99))
-              .setTransmissionPower(-59)
-              .setLayout(BeaconBroadcast.EDDYSTONE_UID_LAYOUT)
-              .start();
-        }
-
-        beaconBroadcast.getAdvertisingStateChange().listen((isAdvertising) {
-          beaconStatusMessage = "Beacon is now advertising";
-          //   isBroadcasting = true;
-        });
-        break;
-
-      case BeaconStatus.notSupportedMinSdk:
-        beaconStatusMessage =
-            "Your Android system version is too low (min. is 21)";
-        print(beaconStatusMessage);
-        break;
-      case BeaconStatus.notSupportedBle:
-        beaconStatusMessage = "Your device doesn't support BLE";
-        print(beaconStatusMessage);
-        break;
-      case BeaconStatus.notSupportedCannotGetAdvertiser:
-        beaconStatusMessage = "Either your chipset or driver is incompatible";
-        print(beaconStatusMessage);
-        break;
-    }
-  }
-
-  stopBeaconBroadcast() {
-    beaconStatusMessage = "Beacon has stopped advertising";
-    beaconBroadcast.stop();
-    print(beaconStatusMessage);
+  List<Place> getPlaces() {
+    return places;
   }
 
   checkGPS() async {
