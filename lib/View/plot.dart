@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:umbrella/Model/BeaconInfo.dart';
+import 'package:umbrella/View/NearbyScreen.dart';
 
 import '../Model/AppStateModel.dart';
 import '../Model/facilities.dart';
@@ -32,23 +34,23 @@ List<double> getVerticesY() {
   return verticesY;
 }
 
-List<Point_> pointsPlaces() {
+List<PointPlace> pointsPlaces() {
   List<Place> places = AppStateModel.instance.getPlaces();
-  final List<Point_> pointPlaces = [];
+  final List<PointPlace> pointPlaces = [];
 
   for (var place in places) {
-    pointPlaces.add(Point_(place.x, place.y, Colors.red, place.name));
+    pointPlaces.add(PointPlace(place.x, place.y, Colors.red, place.name));
   }
 
   return pointPlaces;
 }
 
-List<Point_> pointsBeacons() {
+List<PointPlace> pointsBeacons() {
   List<BeaconInfo> beacons = AppStateModel.instance.getAnchorBeacons();
-  final List<Point_> pointBeacons = [];
+  final List<PointPlace> pointBeacons = [];
 
   for (var beacon in beacons) {
-    pointBeacons.add(Point_(beacon.x, beacon.y, Colors.blue, ''));
+    pointBeacons.add(PointPlace(beacon.x, beacon.y, Colors.blue, ''));
   }
 
   return pointBeacons;
@@ -65,7 +67,7 @@ Map<String, double> getTransform(
   final propX = size.width / diffX;
   final propY = size.height / diffY;
 
-  final proportion = propX > propY ? propY : propX;
+  final proportion = propX < propY ? propX : propY;
 
   final Map<String, double> transformation = {
     'proportion': proportion,
@@ -76,13 +78,21 @@ Map<String, double> getTransform(
   return transformation;
 }
 
-Offset getPointTransformed(Point_ point, Map<String, double> transformation) {
+Offset getCoordinatesToPixels(
+    PointPlace point, Map<String, double> transformation) {
   return point.offset * transformation['proportion'] +
       Offset(transformation['offsetX'], transformation['offsetY']);
 }
 
+Offset getPixelsToCoordinates(
+    PointPlace point, Map<String, double> transformation) {
+  return (point.offset -
+          Offset(transformation['offsetX'], transformation['offsetY'])) /
+      transformation['proportion'];
+}
+
 class PlotMap extends CustomPainter {
-  final Function(Offset) onPointPressed;
+  final Function(PointPlace) onPointPressed;
   final Function() onOutsidePressed;
 
   PlotMap(this.onPointPressed, this.onOutsidePressed);
@@ -114,7 +124,7 @@ class PlotMap extends CustomPainter {
     final transformation = getTransform(size, getVerticesX(), getVerticesY());
     if (transformation != null) {
       Paint paint = Paint()
-        ..color = Color(0xf0f0f0f0)
+        ..color = Colors.grey.shade300
         ..style = PaintingStyle.fill
         ..strokeWidth = 8.0;
 
@@ -128,7 +138,8 @@ class PlotMap extends CustomPainter {
           ..strokeWidth = 4
           ..strokeCap = StrokeCap.round;
 
-        canvas.drawCircle(getPointTransformed(point, transformation), 8, paint);
+        canvas.drawCircle(
+            getCoordinatesToPixels(point, transformation), 8, paint);
       }
 
       for (final point in pointsBeacons()) {
@@ -137,7 +148,8 @@ class PlotMap extends CustomPainter {
           ..strokeWidth = 2
           ..strokeCap = StrokeCap.round;
 
-        canvas.drawCircle(getPointTransformed(point, transformation), 8, paint);
+        canvas.drawCircle(
+            getCoordinatesToPixels(point, transformation), 4, paint);
       }
     }
   }
@@ -149,9 +161,10 @@ class PlotMap extends CustomPainter {
     final transformation = getTransform(size, getVerticesX(), getVerticesY());
 
     for (final point in pointsPlaces()) {
-      final point_ = getPointTransformed(point, transformation);
+      final point_ = getCoordinatesToPixels(point, transformation);
       if ((localPosition - point_).distance <= 20.0) {
-        onPointPressed(point_);
+        onPointPressed(
+            PointPlace(point_.dx, point_.dy, point.color, point.nombre));
         return;
       }
     }
@@ -162,18 +175,22 @@ class PlotMap extends CustomPainter {
 
 class PlotLocationPainter extends CustomPainter {
   List<Point> points = [];
-  final Offset selected;
+  final Offset destination;
   final bool isFrozen;
+  final distance = StreamController<double>();
 
-  PlotLocationPainter(this.points, this.selected, this.isFrozen);
+  PlotLocationPainter(this.points, this.destination, this.isFrozen);
 
   @override
   void paint(Canvas canvas, Size size) {
     Paint paint = Paint()
-      ..color = Colors.cyan
       ..style = PaintingStyle.fill
       ..strokeWidth = 20.0
       ..strokeCap = StrokeCap.round;
+    final Paint linePaint = Paint()
+      ..color = Colors.blue
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = 3.0;
 
     if (!isFrozen && this.points.length > 0) {
       final verticesX = getVerticesX();
@@ -181,39 +198,41 @@ class PlotLocationPainter extends CustomPainter {
       final transformation = getTransform(size, verticesX, verticesY);
 
       if (transformation != null) {
-        for (var point in this.points) {
+        for (int i = 0; i < points.length; i++) {
+          paint.color = colors[i];
           canvas.drawPoints(
               ui.PointMode.points,
               [
-                Offset(
-                    point.x * transformation['proportion'] +
-                        transformation['offsetX'],
-                    point.y * transformation['proportion'] +
-                        transformation['offsetY'])
+                getCoordinatesToPixels(
+                    PointPlace(points[i].x, points[i].y, Colors.white, ''),
+                    transformation)
               ],
               paint);
         }
       }
 
-      if (this.selected != null) {
+      if (this.destination != null) {
         // Draw line to destination
-        final Paint linePaint = Paint()
-          ..color = Colors.blue
-          ..strokeCap = StrokeCap.round
-          ..strokeWidth = 3.0;
+        final destinationAbs = getPixelsToCoordinates(
+            PointPlace(
+                this.destination.dx, this.destination.dy, Colors.white, ''),
+            transformation);
 
-        final destination = Offset(
-            this.points[0].x * transformation['proportion'] +
-                transformation['offsetX'],
-            this.points[0].y * transformation['proportion'] +
-                transformation['offsetY']);
+        final double measured =
+            (destinationAbs - Offset(this.points[0].x, this.points[0].y))
+                .distance;
+        distance.sink.add(measured);
 
-        double cornerX = destination.dx;
-        double cornerY = this.selected.dy;
+        final originPixels = getCoordinatesToPixels(
+            PointPlace(this.points[0].x, this.points[0].y, Colors.white, ''),
+            transformation);
+
+        double cornerX = originPixels.dx;
+        double cornerY = this.destination.dy;
         final Offset cornerPoint = Offset(cornerX, cornerY);
 
-        canvas.drawLine(this.selected, cornerPoint, linePaint);
-        canvas.drawLine(cornerPoint, destination, linePaint);
+        canvas.drawLine(originPixels, cornerPoint, linePaint);
+        canvas.drawLine(cornerPoint, this.destination, linePaint);
       }
     }
   }
@@ -222,10 +241,13 @@ class PlotLocationPainter extends CustomPainter {
   bool shouldRepaint(CustomPainter oldDelegate) => true;
 }
 
-class Point_ {
+class PointPlace {
   final Offset offset;
   final Color color;
   final String nombre;
 
-  Point_(double x, double y, this.color, this.nombre) : offset = Offset(x, y);
+  PointPlace(double x, double y, this.color, this.nombre)
+      : offset = Offset(x, y);
 }
+
+var colors = [Colors.cyan, Colors.amber, Colors.green];

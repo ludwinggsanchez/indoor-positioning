@@ -28,6 +28,7 @@ dependencies:
   wakelock: ^0.6.2
   connectivity_plus: ^2.3.7
   ml_linalg: ^13.10.0
+  matrix2d: ^1.0.2
 
 dev_dependencies:
   flutter_test:

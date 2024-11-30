@@ -35,8 +35,52 @@ abstract class Beacon {
     return LogDistancePathLossModel(rawRssi).getCalculatedDistance();
   }
 
+  double getLogDistance_(
+      bool mode,
+      double ref1,
+      double ref2,
+      double coeff1,
+      double reffRssi1,
+      double coeff2,
+      double reffRssi2,
+      double coeff3,
+      double reffRssi3) {
+    double coeff;
+    double reffRssi;
+    ;
+
+    if (rawRssi > ref1) {
+      coeff = coeff1;
+      reffRssi = reffRssi1;
+    } else if (rawRssi > ref2) {
+      coeff = coeff2;
+      reffRssi = reffRssi2;
+    } else {
+      coeff = coeff3;
+      reffRssi = reffRssi3;
+    }
+
+    if (mode == true) {
+      return LogDistancePathLossModel(kfRssi)
+          .getCalculatedDistance_(coeff, reffRssi);
+    } else {
+      return LogDistancePathLossModel(rawRssi)
+          .getCalculatedDistance_(coeff, reffRssi);
+    }
+  }
+
+  double rawRssiLogDistance_(double coeff, double reffRssi) {
+    return LogDistancePathLossModel(rawRssi)
+        .getCalculatedDistance_(coeff, reffRssi);
+  }
+
   double get kfRssiLogDistance {
     return LogDistancePathLossModel(kfRssi).getCalculatedDistance();
+  }
+
+  double kfRssiLogDistance_(double coeff, double reffRssi) {
+    return LogDistancePathLossModel(kfRssi)
+        .getCalculatedDistance_(coeff, reffRssi);
   }
 
   double get rawRssiLibraryDistance {

@@ -3,33 +3,33 @@ import 'package:flutter/foundation.dart';
 
 class Floor {
   Floor({
+    @required this.active,
     @required this.name,
     @required this.description,
-    @required this.majorId,
     @required this.vertices,
     @required this.id,
   });
 
+  final bool active;
   final String name;
   final String description;
-  final int majorId;
   final String id;
   final List<dynamic> vertices;
 
   factory Floor.fromJson(Map<String, dynamic> json, String id) {
     return Floor(
+      active: json['active'],
       name: json['name'],
       description: json['description'],
-      majorId: json['majorId'],
       vertices: json['vertices'],
       id: id,
     );
   }
 
   Map<String, dynamic> toJson() => {
+        'active': active,
         'name': name,
         'description': description,
-        'majorId': majorId,
         'vertices': vertices,
       };
 }

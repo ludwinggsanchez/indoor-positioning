@@ -106,10 +106,6 @@ class AppStateModel extends foundation.ChangeNotifier {
     streamPlaces();
   }
 
-  void removeBeacon(String path) async {
-    await anchorPath.doc(path).delete();
-  }
-
   void streamAnchorBeacons() {
     beaconSnapshots =
         FirebaseFirestore.instance.collection(anchorPath.path).snapshots();
@@ -132,7 +128,10 @@ class AppStateModel extends foundation.ChangeNotifier {
       floors = [];
       for (var document in s.docs) {
         floors = List.from(floors);
-        floors.add(Floor.fromJson(document.data(), document.id));
+        Floor floor = Floor.fromJson(document.data(), document.id);
+        if (floor.active == true) {
+          floors.add(floor);
+        }
       }
       debugPrint("REGISTERED FLOORS: " + floors.length.toString());
     });
@@ -148,6 +147,7 @@ class AppStateModel extends foundation.ChangeNotifier {
         places = List.from(places);
         places.add(Place.fromJson(document.data(), document.id));
       }
+      debugPrint("REGISTERED PLACES: " + places.length.toString());
     });
   }
 
