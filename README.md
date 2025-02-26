@@ -9,3 +9,4 @@ The goal of this application is to provide an accurate distance approximation of
 The application uses a Log Distance Path Model to calculate distance from one phone to another using RSSI, which is smoothed using a configured Kalman Filter in one dimension.
 
 Position is calculated using both Weighted Trilateration and Min Max methods, with the Min Max method being deemed the more accurate of the two.
+
